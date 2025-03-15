@@ -1,0 +1,11 @@
+.vscode/
+**/*.o
+**/*.su
+**/*.out
+**/*.ini
+**/*.png
+!renders/*.png
+**/*.hdr
+assets/env_maps/
+renderdoc_1.36/
+**/*.Identifier
