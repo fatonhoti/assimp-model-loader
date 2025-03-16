@@ -1,7 +1,7 @@
 # Compiler and flags (missing -Werror)
 CXX = g++
 CXXFLAGS = -O3 -std=c++20 -Wall -pedantic -I ./include  -I ./external
-LDFLAGS = -lglfw -lGL
+LDFLAGS = -lglfw -lGL -lassimp
 
 # Source files
 SRC_DIR = ./src

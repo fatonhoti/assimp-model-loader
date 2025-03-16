@@ -1,8 +1,3 @@
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "tiny_gltf.h"
-
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
@@ -15,131 +10,11 @@
 #include "graphics_shader.hpp"
 #include "camera.hpp"
 
+#include "mesh.hpp"
+
 GLFWwindow* window;
 constexpr int WINDOW_WIDTH = 1280;
 constexpr int WINDOW_HEIGHT = 1024;
-
-std::vector<float> positions, normals, texCoords;
-std::vector<unsigned short> indices;
-
-bool LoadGLTFModel() {
-    const auto cwd = std::filesystem::current_path();
-    const auto path_model = cwd / "assets" / "models" / "monkey.glb";
-    tinygltf::Model model;
-    tinygltf::TinyGLTF loader;
-    std::string err;
-    std::string warn;
-
-    //bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path_model.c_str());
-    bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, path_model.c_str());
-
-    if (!warn.empty()) {
-        printf("Warn: %s\n", warn.c_str());
-    }
-    
-    if (!err.empty()) {
-        throw std::runtime_error("Err: " + err + "\n");
-    }
-
-    if (!ret) {
-        printf("Failed to parse glTF\n");
-        return EXIT_FAILURE;
-    }
-
-    for (const auto& node : model.nodes) {
-        if (node.mesh < 0) continue;
-
-        const tinygltf::Mesh& mesh = model.meshes[node.mesh];
-
-        for (const auto& primitive : mesh.primitives) {
-            if (primitive.mode != TINYGLTF_MODE_TRIANGLES) continue;
-
-            if (primitive.attributes.find("POSITION") != primitive.attributes.end()) {
-                const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("POSITION")];
-                const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-                const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-
-                if (accessor.type == TINYGLTF_TYPE_VEC3 && accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
-                    const float* data = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
-                    positions.insert(positions.end(), data, data + accessor.count * 3);
-                }
-            }
-
-            if (primitive.attributes.find("NORMAL") != primitive.attributes.end()) {
-                const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("NORMAL")];
-                const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-                const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-
-                if (accessor.type == TINYGLTF_TYPE_VEC3 && accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
-                    const float* data = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
-                    normals.insert(normals.end(), data, data + accessor.count * 3);
-                }
-            }
-
-            if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end()) {
-                const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("TEXCOORD_0")];
-                const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-                const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-
-                if (accessor.type == TINYGLTF_TYPE_VEC2 && accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
-                    const float* data = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
-                    texCoords.insert(texCoords.end(), data, data + accessor.count * 2);
-                }
-            }
-
-            if (primitive.indices >= 0) {
-                const tinygltf::Accessor& accessor = model.accessors[primitive.indices];
-                const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-                const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-
-                size_t indexSize = tinygltf::GetComponentSizeInBytes(accessor.componentType);
-                const unsigned char* dataPtr = buffer.data.data() + bufferView.byteOffset + accessor.byteOffset;
-
-                for (size_t i = 0; i < accessor.count; i++) {
-                    if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-                        indices.push_back(*reinterpret_cast<const unsigned short*>(dataPtr + i * indexSize));
-                    } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
-                        indices.push_back(*reinterpret_cast<const unsigned int*>(dataPtr + i * indexSize));
-                    }
-                }
-            }
-        }
-    }
-
-    return true;
-}
-
-GLuint VAO, VBO, NBO, TBO, EBO;
-
-void SetupGLBuffers() {
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &NBO);
-    glGenBuffers(1, &TBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(float), positions.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, NBO);
-    glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(float), normals.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-
-    glBindBuffer(GL_ARRAY_BUFFER, TBO);
-    glBufferData(GL_ARRAY_BUFFER, texCoords.size() * sizeof(float), texCoords.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(2);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned short), indices.data(), GL_STATIC_DRAW);
-
-    glBindVertexArray(0);
-}
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
@@ -174,6 +49,7 @@ int main()
     }
 
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
@@ -188,6 +64,27 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
 
+    glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CCW);
+    glCullFace(GL_BACK);
+
+    // test triangle
+    float vertices[] = {
+        -0.5f, -0.5f, 0.0f, // left  
+         0.5f, -0.5f, 0.0f, // right 
+         0.0f,  0.5f, 0.0f  // top   
+    }; 
+    GLuint VBO, VAO;
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0); 
+    glBindVertexArray(0); 
+
     Camera camera{};
     camera.origin = { 0.0f, 0.0f, 5.0f };
 	camera.vertical_fov = 45.0f;
@@ -201,16 +98,12 @@ int main()
     GraphicsShader shader("default.vert", "default.frag");
     shader.use();
 
-    glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
-
-    if (!LoadGLTFModel()) {
-        std::cerr << "Failed to load model!" << std::endl;
-        return EXIT_FAILURE;
+    Mesh mesh{};
+    if (!mesh.load_mesh("monkey.glb")) {
+        throw std::runtime_error("Failed to load mesh.\n");
     }
-
-    SetupGLBuffers();
-
     auto model_matrix = glm::mat4(1.0f);
+    //model_matrix = glm::scale(model_matrix, glm::vec3(0.05f));
 
     float deltatime{ 0.0f };
     float last_frame{ 0.0f };
@@ -231,7 +124,9 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_SHORT, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        mesh.render();
         
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             camera.move(FORWARD, deltatime);

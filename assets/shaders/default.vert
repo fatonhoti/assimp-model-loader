@@ -15,6 +15,6 @@ void main() {
     const vec4 worldSpacePos = u_ModelMatrix * vec4(pos, 1.0f);
     gl_Position = u_PV * worldSpacePos;
     worldSpacePos_ = vec3(worldSpacePos);
-    normal_ = vec3(inverse(transpose(u_ModelMatrix)) * vec4(normal, 0.0f));
+    normal_ = normalize(transpose(inverse(mat3(u_ModelMatrix))) * normal);
     texCoord_ = texCoord;
 }
